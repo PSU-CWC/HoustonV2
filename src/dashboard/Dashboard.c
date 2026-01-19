@@ -2,11 +2,10 @@
 #include "COBS.h"
 
 enum {
-    kAlertBufSize = 100,
+    kAlertBufSize = 256,
     kAlertBufCOBSize = kAlertBufSize + (kAlertBufSize / 254) + 1,
-    kLiveDataBufSize = 5,
+    kLiveDataBufSize = 10,
 };
-
 
 static char alertBuffer[kAlertBufSize] = {0};
 static char alertBufferCOBS[kAlertBufCOBSize] = {0};
@@ -88,7 +87,7 @@ static Dashboard_Status_t processPacket(Dashboard_t *dashboard) {
             return DASHBOARD_ERR_SEND_FAIL;
         }
     } else if (header->packetType == ID_Modify) {
-        Dashboard_Alert(dashboard, "Live Data Modify Received");
+        //Dashboard_Alert(dashboard, "Live Data Modify Received");
         LiveDataPacket_t *packet = (LiveDataPacket_t *) (rxBuffer + sizeof(DashboardPacketHeader_t));
 
         for (uint32_t i = 0; i < dashboard->liveDataCount; i++) {
@@ -127,12 +126,11 @@ Dashboard_Status_t Dashboard_Init(Dashboard_t *dashboard,
     return DASHBOARD_OK;
 }
 
-Dashboard_Status_t
-Dashboard_Register_LiveData(Dashboard_t *dashboard, const char* label, void *data, ValueType_t type) {
+Dashboard_Status_t Dashboard_Register_LiveData(Dashboard_t *dashboard, const char* label, void *data, ValueType_t type) {
     if (dashboard == NULL || data == NULL || dashboard->liveDataCount >= kLiveDataBufSize) {
         return DASHBOARD_ERR_INVALID_ARG;
     }
-    
+
     liveDataBuffer[dashboard->liveDataCount].packetID = dashboard->liveDataCount;
     strncpy(liveDataBuffer[dashboard->liveDataCount].label, label, sizeof(liveDataBuffer[dashboard->liveDataCount].label) - 1);
     liveDataBuffer[dashboard->liveDataCount].label[sizeof(liveDataBuffer[dashboard->liveDataCount].label) - 1] = '\0';
@@ -229,7 +227,7 @@ Dashboard_Status_t Dashboard_Update(Dashboard_t *dashboard) {
                                        header->payloadKeySize + header->payloadValueSize +
                                        sizeof(DashboardPacketTail_t);
             if (totalPacketSize < kAlertBufCOBSize) {
-                Dashboard_Alert(dashboard, "Received packet header");
+                //Dashboard_Alert(dashboard, "Received packet header");
 
                 dashboard->packetStatus = Dashboard_Packet_HEADER_RECEIVED;
             } else {
@@ -251,10 +249,10 @@ Dashboard_Status_t Dashboard_Update(Dashboard_t *dashboard) {
                                     header->payloadValueSize, payloadChecksum);
 
             dashboard->packetStatus = Dashboard_Packet_WAITING;
-            Dashboard_Telemetry_Uint32(dashboard, "CalculuatedCRC", payloadChecksum);
-            Dashboard_Telemetry_Uint32(dashboard, "ReceivedCRC", tail->payloadChecksum);
+            //Dashboard_Telemetry_Uint32(dashboard, "CalculuatedCRC", payloadChecksum);
+            //Dashboard_Telemetry_Uint32(dashboard, "ReceivedCRC", tail->payloadChecksum);
             if (payloadChecksum == tail->payloadChecksum) {
-                Dashboard_Alert(dashboard, "Processing packet");
+                //Dashboard_Alert(dashboard, "Processing packet");
                 return processPacket(dashboard);
             } else {
                 Dashboard_Alert(dashboard, "Payload checksum mismatch");

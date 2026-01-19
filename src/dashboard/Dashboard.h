@@ -81,7 +81,7 @@ typedef struct __attribute__((packed)) {
     uint16_t checksum;
 } DashboardPacketHeader_t;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     char label[24];
     uint16_t packetID;
     uint16_t valueType;
