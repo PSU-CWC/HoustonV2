@@ -73,16 +73,17 @@ void LiveDataPanel::render() {
     ImGui::Begin("Live Data");
     for (const auto &it: liveDataMap) {
 
+        const char* label = it.second.label;
+
         if (it.second.valueType == TYPE_BOOL) {
-            if (ImGui::Checkbox(std::to_string(it.first).c_str(), reinterpret_cast<bool *>(intMap[it.first]))) {
+            if (ImGui::Checkbox(label, reinterpret_cast<bool *>(intMap[it.first]))) {
                 sendModifyPacket(it.first, it.second.valueType);
             }
         } else {
             if (it.second.valueType == TYPE_FLOAT) {
-                ImGui::InputFloat(std::to_string(it.first).c_str(), floatMap[it.first], 0.1f, 1.0f,
-                                  "%.3f", 0);
+                ImGui::InputFloat(label, floatMap[it.first], 0.1f, 1.0f, "%.3f", 0);
             } else {
-                ImGui::InputInt(std::to_string(it.first).c_str(), intMap[it.first], 1, 100, 0);
+                ImGui::InputInt(label, intMap[it.first], 1, 100, 0);
             }
 
             ImGui::SameLine();

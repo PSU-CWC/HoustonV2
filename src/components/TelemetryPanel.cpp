@@ -1,140 +1,119 @@
 #include "TelemetryPanel.h"
 #include "../consumer/TelemetryConsumer.h"
+#include <chrono>
+#include <iostream>
+namespace fs = std::filesystem;
 
 void TelemetryPanel::start() {
     telemetryMap.clear();
+    savingFile = false;
 }
 
-
 void TelemetryPanel::render() {
-    timer += ImGui::GetIO().DeltaTime * 1000; // Convert deltaTime to milliseconds
+    // 1. Process Incoming Data from the Queue
     DataConsumer *consumer = dispatcher->getHandler(ID_Telemetry);
     if (consumer) {
         auto *queueData = dynamic_cast<TypedConsumer<std::tuple<std::string, std::string>> *>(consumer);
-        while (!queueData->isEmpty()) {
-            auto [key, val] = queueData->pop().value();;
-            telemetryMap[std::move(key)] = std::move(val);
+        while (queueData && !queueData->isEmpty()) {
+            auto dataOpt = queueData->pop();
+            if (dataOpt.has_value()) {
+                auto [key, val] = dataOpt.value();
+                telemetryMap[key] = val; 
+            }
         }
     }
 
-    if (savingFile) {
+    // 2. Background File Logging (Runs every frame while savingFile is true)
+    if (savingFile && file.is_open()) {
         auto now = std::chrono::system_clock::now();
         auto ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-        auto value = ms.time_since_epoch().count();
-        file << value << ",";
-        for (int i = 1; i < csvHeaders.size(); i++) {
-            if (telemetryMap.count(csvHeaders[i]) > 0) {
-                file << telemetryMap[csvHeaders[i]] << ",";
-            } else {
-                file << "-1,";
-                continue;
-            }
-            //std::cout << telemetryMap[csvHeader] << ",";
+        file << ms.time_since_epoch().count() << ",";
+
+        for (size_t i = 1; i < csvHeaders.size(); i++) {
+            const std::string& key = csvHeaders[i];
+            file << (telemetryMap.count(key) > 0 ? telemetryMap[key] : "0");
+            if (i < csvHeaders.size() - 1) file << ",";
         }
-        file << std::endl;
-        //std::cout << std::endl;
+        file << "\n";
     }
 
-
-
-    // Create a window
+    // 3. UI Rendering
     ImGui::Begin("Telemetry");
-    ImGui::Columns(2, "Data");
+
+    // Table View
+    ImGui::Columns(2, "DataDisplay");
     ImGui::Separator();
-    for (const auto &pair: telemetryMap) {
+    for (const auto &pair : telemetryMap) {
         ImGui::Text("%s", pair.first.c_str());
         ImGui::NextColumn();
         ImGui::Text("%s", pair.second.c_str());
         ImGui::NextColumn();
         ImGui::Separator();
     }
+    ImGui::Columns(1); 
 
-    ImGui::InputText("File", csvFileBuffer, IM_ARRAYSIZE(csvFileBuffer));
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::InputText("Filename", csvFileBuffer, IM_ARRAYSIZE(csvFileBuffer));
+
     if (savingFile) {
+        // --- UI for STOPPING ---
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
         if (ImGui::Button("Stop Saving File")) {
             savingFile = false;
             file.close();
         }
+        ImGui::PopStyleColor();
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "REC: %s", csvFileBuffer);
     } else {
-        if (ImGui::Button("Save File")) {
-            csvHeaders.clear();
-            file.open(csvFileBuffer, std::ios_base::app); // Open the file in append mode
-            if (!file.is_open()) {
-                std::cerr << "Error: Unable to open file " << std::endl;
-                return;
-            }
-            csvHeaders.emplace_back("Time");
-            file << "Time,";
-            for (auto it = dataMap.begin(); it != dataMap.end(); ++it) {
-                csvHeaders.push_back(it->first);
-                file << it->first << ",";
-            }
-            file << std::endl;
+        // --- UI for STARTING ---
+        if (ImGui::Button("Start Saving File")) {
+            std::string filename = csvFileBuffer;
+            if (filename.empty()) filename = "telemetry_data.csv";
 
-            savingFile = true;
+            fs::path p(filename);
+
+            // Force to Desktop if no path provided
+            if (!p.has_parent_path()) {
+                const char* homeDir = getenv("HOME");
+                if (homeDir) {
+                    p = fs::path(homeDir) / "Desktop" / p;
+                }
+            }
+
+            csvHeaders.clear();
+            csvHeaders.emplace_back("Time");
+
+            file.open(p.string(), std::ios::out); 
+            if (file.is_open()) {
+                // Write Header Row
+                file << "Time";
+                for (const auto &pair : telemetryMap) {
+                    csvHeaders.push_back(pair.first);
+                    file << "," << pair.first;
+                }
+                file << "\n";
+                savingFile = true;
+                
+                // Copy the resolved path back to the buffer so the user sees where it went
+                strncpy(csvFileBuffer, p.string().c_str(), IM_ARRAYSIZE(csvFileBuffer) - 1);
+            }
         }
     }
 
-    ImGui::End();
-//    ImGui::Begin("Digital Plots");
-//    graphData();
-//    ImGui::End();
-
+    // This MUST be the last line of the function and MUST be outside any if/else
+    ImGui::End(); 
 }
 
 void TelemetryPanel::stop() {
-
-    initalized = false;
-
-    dataMap.clear();
-    showMap.clear();
-    savingFile = false;
-    csvHeaders.clear();
+    if (savingFile) {
+        file.close();
+        savingFile = false;
+    }
     telemetryMap.clear();
-    file.close();
+    csvHeaders.clear();
 }
 
-TelemetryPanel::~TelemetryPanel() = default;
-
-
-//void TelemetryPanel::graphData() {
-//    if (!initalized) {
-//        return;
-//    }
-//    for (const auto &pair: telemetryMap) {
-//        ImGui::Checkbox(pair.first.c_str(), showMap[pair.first]);
-//        ImGui::SameLine();
-//    }
-//    ImGui::Checkbox("Auto Scale", &autoScale);
-//    ImGui::SameLine();
-//    ImGui::SliderFloat("History", &history, 1, 60, "%.1f s");
-//
-//
-//    static float t = 0;
-//
-//    if (!paused) {
-//        t += ImGui::GetIO().DeltaTime;
-//        for (const auto &pair: telemetryMap) {
-//            if (*showMap[pair.first]) {
-//                dataMap[pair.first]->AddPoint(t, std::stof(pair.second));
-//            }
-//        }
-//    }
-//    if (autoScale) {
-//        ImPlot::SetNextAxesToFit();
-//    }
-//
-//    if (ImPlot::BeginPlot("##Digital", ImVec2(-1, -1), ImPlotAxisFlags_AutoFit)) {
-//        ImPlot::SetupAxes(nullptr, nullptr);
-//        ImPlot::SetupAxisLimits(ImAxis_X1, t - history, t, ImGuiCond_Always);
-//        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 1);
-//        for (const auto &pair: telemetryMap) {
-//            if (*showMap[pair.first]) {
-//                ImPlot::PlotLine(pair.first.c_str(), &dataMap[pair.first]->Data[0].x, &dataMap[pair.first]->Data[0].y,
-//                                 dataMap[pair.first]->Data.size(), 0,
-//                                 dataMap[pair.first]->Offset, 2 * sizeof(float));
-//            }
-//        }
-//        ImPlot::EndPlot();
-//    }
-//}
+TelemetryPanel::~TelemetryPanel() {
+    stop();
+}

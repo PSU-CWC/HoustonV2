@@ -128,11 +128,14 @@ Dashboard_Status_t Dashboard_Init(Dashboard_t *dashboard,
 }
 
 Dashboard_Status_t
-Dashboard_Register_LiveData(Dashboard_t *dashboard, uint16_t key, void *data, ValueType_t type) {
+Dashboard_Register_LiveData(Dashboard_t *dashboard, const char* label, void *data, ValueType_t type) {
     if (dashboard == NULL || data == NULL || dashboard->liveDataCount >= kLiveDataBufSize) {
         return DASHBOARD_ERR_INVALID_ARG;
     }
-    liveDataBuffer[dashboard->liveDataCount].packetID = key;
+    
+    liveDataBuffer[dashboard->liveDataCount].packetID = dashboard->liveDataCount;
+    strncpy(liveDataBuffer[dashboard->liveDataCount].label, label, sizeof(liveDataBuffer[dashboard->liveDataCount].label) - 1);
+    liveDataBuffer[dashboard->liveDataCount].label[sizeof(liveDataBuffer[dashboard->liveDataCount].label) - 1] = '\0';
     liveDataBuffer[dashboard->liveDataCount].valueType = type;
     liveDataPtr[dashboard->liveDataCount] = data;
 

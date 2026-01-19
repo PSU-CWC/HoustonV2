@@ -80,16 +80,19 @@ typedef struct __attribute__((packed)) {
     uint32_t timestamp;
     uint16_t checksum;
 } DashboardPacketHeader_t;
-typedef struct __attribute__((packed)) {
+
+typedef struct {
+    char label[24];
     uint16_t packetID;
     uint16_t valueType;
     union {
-        uint32_t uint32Value;
-        int32_t int32Value;
         float floatValue;
+        int32_t int32Value;
+        uint32_t uint32Value;
         bool boolValue;
     };
 } LiveDataPacket_t;
+
 typedef struct __attribute__((packed)) {
     uint32_t payloadChecksum;
 } DashboardPacketTail_t;
@@ -125,7 +128,7 @@ Dashboard_Status_t Dashboard_Telemetry_Uint32(Dashboard_t *dashboard, const char
 
 Dashboard_Status_t Dashboard_Telemetry_Str(Dashboard_t *dashboard, const char *key, const char *value);
 
-Dashboard_Status_t Dashboard_Register_LiveData(Dashboard_t *dashboard, uint16_t key, void *data, ValueType_t type);
+Dashboard_Status_t Dashboard_Register_LiveData(Dashboard_t *dashboard, const char* label, void *data, ValueType_t type);
 
 Dashboard_Status_t Dashboard_Update(Dashboard_t *dashboard);
 
