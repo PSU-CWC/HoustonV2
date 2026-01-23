@@ -4,6 +4,7 @@ wind turbine, but it can be used for any board that supports serial data.
 
 ![img.png](src/resource/img.png)
 
+## How to Use
 ### Building the Code
 You can compile this project on Windows, macOS, or Linux using the terminal. Ensure you have CMake and a C++ compiler (like GCC, Clang, or MSVC) installed.
 
@@ -13,8 +14,7 @@ Run the following command to generate the build files. This creates a build/ dir
 Once the configuration is complete, run the build command. This transforms the C++ source code into a runnable executable.  
 ```cmake --build build -j 4```.  
 
-### Using the Code
-#### Find the ESP32 Port
+### Find the ESP32 Port
 Windows
 * Connect the ESP32 to your computer via USB.
 * Right-click the Start button and select Device Manager.
@@ -34,7 +34,7 @@ Linux
 * Look for "attached to ttyUSB" at the bottom of the output.
 * Your port will look like: /dev/ttyUSB0 or /dev/ttyUSB1.
 
-#### Run the code
+### Run the code
 Run the executable file that you made.  
 In the Control Panel section type in the port and click attach.
 
