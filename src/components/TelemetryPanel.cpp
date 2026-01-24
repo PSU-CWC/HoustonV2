@@ -2,6 +2,8 @@
 #include "../consumer/TelemetryConsumer.h"
 #include <chrono>
 #include <iostream>
+#include <filesystem>
+#include <fstream>
 namespace fs = std::filesystem;
 
 void TelemetryPanel::start() {
