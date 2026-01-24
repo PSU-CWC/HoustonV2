@@ -64,6 +64,7 @@ typedef struct {
         float floatValue;
         bool boolValue;
     };
+    char label[32];
 } LiveDataPacket_t;
 typedef struct {
     uint32_t payloadChecksum;
