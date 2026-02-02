@@ -56,6 +56,7 @@ typedef struct {
     uint16_t checksum;
 } DashboardPacketHeader_t;
 typedef struct {
+    char label[24];
     uint16_t packetID;
     uint16_t valueType;
     union {
@@ -64,7 +65,6 @@ typedef struct {
         float floatValue;
         bool boolValue;
     };
-    char label[32];
 } LiveDataPacket_t;
 typedef struct {
     uint32_t payloadChecksum;
