@@ -4,7 +4,7 @@
 enum {
     kAlertBufSize = 256,
     kAlertBufCOBSize = kAlertBufSize + (kAlertBufSize / 254) + 1,
-    kLiveDataBufSize = 10,
+    kLiveDataBufSize = 14, // increase this to include more livedata ins
 };
 
 static char alertBuffer[kAlertBufSize] = {0};
