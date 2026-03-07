@@ -9,16 +9,16 @@
 
 class TelemetryPanel : public Component {
 private:
-//    std::vector<std::string> keys;
-//    std::vector<std::string> values;
     std::map<std::string, std::string> telemetryMap;
     bool paused = false;
-    bool initalized = false;
+    bool initialized = false; // Fixed spelling
     float history = 10.0f;
     bool autoScale = true;
+    
     std::map<std::string, Util::ScrollingBuffer *> dataMap;
-    std::map<std::string, bool *> showMap;
-    char csvFileBuffer[256] = "data.csv"; // Buffer to store input text
+    std::map<std::string, bool> showMap; // Changed bool* to bool for safety
+    
+    char csvFileBuffer[256] = "data.csv";
     bool savingFile = false;
     std::vector<std::string> csvHeaders;
     std::ofstream file;
@@ -26,17 +26,13 @@ private:
     int timer = 0;
 
 public:
-
-    TelemetryPanel(const char *name, Dispatcher *dispatcher) : Component(name, dispatcher) {
+    TelemetryPanel(const char *name, Dispatcher *dispatcher) 
+        : Component(name, dispatcher), initialized(true) { // Set to true here or in start()
     }
 
     ~TelemetryPanel() override;
-
     void start() override;
-
     void render() override;
-
     void stop() override;
-//
-//    void graphData();
+    void graphData();
 };

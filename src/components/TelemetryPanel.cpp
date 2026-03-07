@@ -6,9 +6,19 @@
 #include <fstream>
 namespace fs = std::filesystem;
 
+ImPlotPoint TelemetryGetter(int idx, void* data) {
+    printf("TelemetryGetter called for idx %d\n", idx);
+
+    auto* buffer = (Util::ScrollingBuffer*)data;
+    // This handles the circular wrap-around logic
+    int real_idx = (buffer->Offset + idx) % (int)buffer->Data.size();
+    return ImPlotPoint(buffer->Data[real_idx].x, buffer->Data[real_idx].y);
+}
+
 void TelemetryPanel::start() {
     telemetryMap.clear();
     savingFile = false;
+    initialized = true;
 }
 
 void TelemetryPanel::render() {
@@ -104,18 +114,85 @@ void TelemetryPanel::render() {
     }
 
     // This MUST be the last line of the function and MUST be outside any if/else
-    ImGui::End(); 
+    ImGui::End();
+    ImGui::Begin("Digital Plots");
+    graphData();
+    ImGui::End();
 }
 
 void TelemetryPanel::stop() {
+    initialized = false;
     if (savingFile) {
         file.close();
         savingFile = false;
     }
     telemetryMap.clear();
     csvHeaders.clear();
+    dataMap.clear();
+    showMap.clear();
 }
 
-TelemetryPanel::~TelemetryPanel() {
-    stop();
+TelemetryPanel::~TelemetryPanel() = default;
+
+void TelemetryPanel::graphData() {
+    if (!initialized) {
+        return;
+    }
+    
+    // Draw checkboxes for each telemetry metric
+    for (const auto &pair: telemetryMap) {
+        ImGui::Checkbox(pair.first.c_str(), &showMap[pair.first]);
+        ImGui::SameLine();
+    }
+    ImGui::Checkbox("Auto Scale", &autoScale);
+    ImGui::SameLine();
+    ImGui::SliderFloat("History", &history, 1.0f, 60.0f, "%.1f s");
+
+    static float t = 0;
+
+    // Update data structures if not paused
+    if (!paused) {
+        t += ImGui::GetIO().DeltaTime;
+        for (const auto &pair: telemetryMap) {
+            if (showMap.count(pair.first) && showMap[pair.first]) {
+                try {
+                    float value = std::stof(pair.second);
+            
+                    // --- NEW INITIALIZATION LOGIC ---
+                    if (dataMap.count(pair.first) == 0 || dataMap[pair.first] == nullptr) {
+                        dataMap[pair.first] = new Util::ScrollingBuffer(); 
+                    }
+                    // --------------------------------
+                    
+                    dataMap[pair.first]->AddPoint(t, value);
+                } catch (const std::exception& e) {
+                    // Catch invalid_argument or out_of_range from std::stof
+                    // Optionally log: std::cerr << "Invalid telemetry value: " << pair.second << "\n";
+                }
+            }
+        }
+    }
+
+    // Corrected ImPlot rendering block
+    if (ImPlot::BeginPlot("##Digital", ImVec2(-1, -1))) {
+        ImPlot::SetupAxes("Time (s)", "Value");
+        ImPlot::SetupAxisLimits(ImAxis_X1, t - history, t, ImGuiCond_Always);
+        
+        if (!autoScale) {
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 1, ImGuiCond_Once);
+        }
+
+        for (const auto &pair : telemetryMap) {
+            if (showMap.count(pair.first) && showMap[pair.first]) {
+                auto& buffer = dataMap[pair.first];
+                if (buffer && !buffer->Data.empty()) {
+                    ImPlot::PlotLineG(pair.first.c_str(), 
+                                    TelemetryGetter, 
+                                    (void*)buffer, 
+                                    (int)buffer->Data.size());
+                }
+            }
+        }
+        ImPlot::EndPlot();
+    }
 }

@@ -10,6 +10,8 @@ private:
     std::vector<Component *> *pVector;
     bool isEnable = false;
     DataProducer *dataProducer = nullptr;
+    std::vector<std::string> availablePorts;
+    int selectedPortIndex = 0;
 public:
 
     ControlPanel(const char *name, Dispatcher *dispatcher, std::vector<Component *> *pVector) : Component(name,dispatcher) {

@@ -1,78 +1,114 @@
-
 #include "ControlPanel.h"
+#include "../Util.h"
 #include "../producer/SerialProducer.h"
 
 void ControlPanel::start() {
-
+    // Optionally refresh ports on start
+    availablePorts = Util::getAvailablePorts();
 }
 
 void ControlPanel::render() {
     ImGui::Begin("Control Panel");
-    static char inputText[32] = "COM5"; // Buffer to store input text
-    ImGui::InputText("Port", inputText, IM_ARRAYSIZE(inputText));
-    char portNumber[20];
 
-#ifdef _WIN32
-    if (ImGui::Button("Detect Ports")) {
-        HANDLE hSerial;
-
-        for (int i = 1; i <= 256; i++) {
-            std::sprintf(portNumber, "\\\\.\\com%d", i);
-
-            hSerial = CreateFile(portNumber, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                                 0);
-            if (hSerial != INVALID_HANDLE_VALUE) {
-
-                std::cout << "Detected port: COM" << i << std::endl;
-            }
-            CloseHandle(hSerial);
-
-            memset(portNumber, 0, sizeof(portNumber));
+    // 1. Port Selection Section
+    if (ImGui::Button("Refresh Ports") || availablePorts.empty()) {
+        availablePorts = Util::getAvailablePorts();
+        // Safety check to ensure index doesn't go out of bounds after refresh
+        if (selectedPortIndex >= availablePorts.size()) {
+            selectedPortIndex = 0;
         }
-
     }
-#endif
+
+    ImGui::SameLine();
+
+    if (!availablePorts.empty()) {
+        // Dropdown menu for ports
+        if (ImGui::BeginCombo("Port", availablePorts[selectedPortIndex].c_str())) {
+            for (int i = 0; i < availablePorts.size(); ++i) {
+                const bool isSelected = (selectedPortIndex == i);
+                if (ImGui::Selectable(availablePorts[i].c_str(), isSelected)) {
+                    selectedPortIndex = i;
+                }
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    } else {
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "No serial ports detected.");
+    }
+
+    ImGui::Separator();
+
+    // 2. Attach / Detach Logic
     if (isEnable) {
-        if (ImGui::Button("Detach")) {
-            dataProducer->stop();
-            delete dataProducer;
-            dataProducer = nullptr;
-            for (auto &component: *pVector) {
+        // Show Red Detach button when connected
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.1f, 0.1f, 1.0f));
+        if (ImGui::Button("Detach Device")) {
+            if (dataProducer) {
+                dataProducer->stop();
+                delete dataProducer;
+                dataProducer = nullptr;
+            }
+            for (auto &component : *pVector) {
                 component->stop();
             }
             isEnable = false;
         }
+        ImGui::PopStyleColor();
     } else {
-        if (ImGui::Button("Attach")) {
-            if (dataProducer == nullptr) {
-                dataProducer = new SerialProducer();
-            }
-            dynamic_cast<SerialProducer *>(dataProducer)->setPort(inputText);
+        // Show Green Attach button when disconnected
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.6f, 0.1f, 1.0f));
+        if (ImGui::Button("Attach Device")) {
+            if (!availablePorts.empty()) {
+                if (dataProducer == nullptr) {
+                    dataProducer = new SerialProducer();
+                }
 
-            if(!dataProducer->start()){
-                delete dataProducer;
-                dataProducer = nullptr;
-                ImGui::Text("Failed to open port %s",inputText);
-                ImGui::End();
-                return;
+                std::string selectedPort = availablePorts[selectedPortIndex];
+                dynamic_cast<SerialProducer *>(dataProducer)->setPort(selectedPort);
+
+                if (!dataProducer->start()) {
+                    delete dataProducer;
+                    dataProducer = nullptr;
+                    // Error will show for one frame, consider a persistent status string
+                } else {
+                    for (auto &component : *pVector) {
+                        component->start();
+                    }
+                    isEnable = true;
+                }
             }
-            for (auto &component: *pVector) {
-                component->start();
-            }
-            isEnable = true;
         }
+        ImGui::PopStyleColor();
     }
+
+    // 3. Status and Performance
     if (dataProducer != nullptr && dataProducer->status) {
         dataProducer->produce(dispatcher);
         dataProducer->send_data(dispatcher);
+        
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "Connected");
     }
+
+    ImGui::Spacing();
     ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    
     ImGui::End();
 }
 
 void ControlPanel::stop() {
+    // Clean up on app close
+    if (isEnable) {
+        if (dataProducer) dataProducer->stop();
+        isEnable = false;
+    }
 }
 
 ControlPanel::~ControlPanel() {
-
+    if (dataProducer) {
+        delete dataProducer;
+    }
 }
