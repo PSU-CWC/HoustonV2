@@ -139,48 +139,43 @@ void TelemetryPanel::graphData() {
         return;
     }
     
-    // Draw checkboxes for each telemetry metric
-    for (const auto &pair: telemetryMap) {
+    // 1. Draw checkboxes for each telemetry metric at the top
+    for (const auto &pair : telemetryMap) {
         ImGui::Checkbox(pair.first.c_str(), &showMap[pair.first]);
         ImGui::SameLine();
     }
-    ImGui::Checkbox("Auto Scale", &autoScale);
-    ImGui::SameLine();
-    ImGui::SliderFloat("History", &history, 1.0f, 60.0f, "%.1f s");
+    ImGui::NewLine(); // Move to a new line after checkboxes
 
     static float t = 0;
 
-    // Update data structures if not paused
+    // 2. Data Logic (Updating buffers)
     if (!paused) {
         t += ImGui::GetIO().DeltaTime;
-        for (const auto &pair: telemetryMap) {
+        for (const auto &pair : telemetryMap) {
             if (showMap.count(pair.first) && showMap[pair.first]) {
                 try {
                     float value = std::stof(pair.second);
-            
-                    // --- NEW INITIALIZATION LOGIC ---
                     if (dataMap.count(pair.first) == 0 || dataMap[pair.first] == nullptr) {
                         dataMap[pair.first] = new Util::ScrollingBuffer(); 
                     }
-                    // --------------------------------
-                    
                     dataMap[pair.first]->AddPoint(t, value);
                 } catch (const std::exception& e) {
-                    // Catch invalid_argument or out_of_range from std::stof
-                    // Optionally log: std::cerr << "Invalid telemetry value: " << pair.second << "\n";
+                    // Handle non-numeric telemetry strings gracefully
                 }
             }
         }
     }
 
-    // Corrected ImPlot rendering block
-    if (ImPlot::BeginPlot("##Digital", ImVec2(-1, -1))) {
+    // 3. Render the Plot (Fixed height to leave room for the slider below)
+    if (ImPlot::BeginPlot("##Digital", ImVec2(-1, 400))) {
         ImPlot::SetupAxes("Time (s)", "Value");
+        
+        // Force X-Axis to scroll with time based on history slider
         ImPlot::SetupAxisLimits(ImAxis_X1, t - history, t, ImGuiCond_Always);
         
-        if (!autoScale) {
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 1, ImGuiCond_Once);
-        }
+        // Since we removed Autoscale, we'll set a default Y range 
+        // that can still be manually panned/zoomed by the user
+        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 100, ImGuiCond_Once);
 
         for (const auto &pair : telemetryMap) {
             if (showMap.count(pair.first) && showMap[pair.first]) {
@@ -195,4 +190,9 @@ void TelemetryPanel::graphData() {
         }
         ImPlot::EndPlot();
     }
+
+    // 4. History Slider (Now rendered BELOW the plot)
+    ImGui::Spacing();
+    ImGui::SetNextItemWidth(-1); // Make slider span the full width of the window
+    ImGui::SliderFloat("History Window", &history, 1.0f, 60.0f, "%.1f seconds");
 }

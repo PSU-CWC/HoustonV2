@@ -110,33 +110,37 @@ private:
     std::deque<std::vector<uint8_t>> tx_queue_;
     std::string portName;
 
+    uint8_t raw_rx_buffer[8192]; // Fixed size raw storage
+    std::vector<uint8_t> accumulator;
+
     void start_read() {
-        // Read until 0x00 (null byte)
-        asio::async_read_until(serial_, read_buffer_, '\0',
-                               [this](const std::error_code &ec, std::size_t /*bytes_transferred*/) {
-                                   if (!ec) {
-                                       std::istream is(&read_buffer_);
-                                       std::string s;
+        serial_.async_read_some(asio::buffer(raw_rx_buffer, sizeof(raw_rx_buffer)),
+            [this](const std::error_code& ec, std::size_t bytes_transferred) {
+                if (!ec) {
+                    for (size_t i = 0; i < bytes_transferred; ++i) {
+                        uint8_t byte = raw_rx_buffer[i];
+                        accumulator.push_back(byte);
 
-                                       // Extract up to the null terminator
-                                       if (std::getline(is, s, '\0')) {
-                                           if (!s.empty()) {
-                                               std::vector<uint8_t> vec(s.begin(), s.end());
-                                               vec.push_back(0x00);
-                                               //std::string s(vec.begin(), vec.end());
+                        // If we hit the COBS terminator
+                        if (byte == 0x00) {
+                            if (accumulator.size() > 1) { // Ignore empty/double zeros
+                                std::lock_guard<std::mutex> lock(rx_mutex_);
+                                if (rx_queue_.size() < RX_CAPACITY) {
+                                    rx_queue_.push_back(accumulator);
+                                }
+                            }
+                            accumulator.clear();
+                        }
+                    }
+                    
+                    // Safety: If accumulator grows too large without a 0x00, clear it
+                    if (accumulator.size() > 8192) accumulator.clear();
 
-                                               //std::cout << s << std::endl;
-                                               std::lock_guard<std::mutex> lock(rx_mutex_);
-                                               if (rx_queue_.size() < RX_CAPACITY) {
-                                                   rx_queue_.push_back(std::move(vec));
-                                               }
-                                           }
-                                       }
-                                       start_read();
-                                   } else {
-                                       std::cerr << "SerialProducer: read error: " << ec.message() << std::endl;
-                                   }
-                               });
+                    start_read(); // Keep reading
+                } else if (ec != asio::error::operation_aborted) {
+                    std::cerr << "Serial Error: " << ec.message() << std::endl;
+                }
+            });
     }
 
     void start_write() {

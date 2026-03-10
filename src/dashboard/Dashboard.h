@@ -45,8 +45,8 @@ typedef enum {
     TYPE_STRING = 0x04
 } ValueType_t;
 
-#ifdef _MSC_VER
 #pragma pack(push, 1)
+
 typedef struct {
     uint8_t packetType;
     uint8_t packetContentType;
@@ -55,49 +55,24 @@ typedef struct {
     uint32_t timestamp;
     uint16_t checksum;
 } DashboardPacketHeader_t;
+
 typedef struct {
-    char label[24];
-    uint16_t packetID;
-    uint16_t valueType;
+    uint8_t packetID; 
+    char label[16];
+    uint8_t valueType;
     union {
-        uint32_t uint32Value;
-        int32_t int32Value;
         float floatValue;
         bool boolValue;
+        int32_t int32Value;
+        uint32_t uint32Value;
     };
 } LiveDataPacket_t;
+
 typedef struct {
     uint32_t payloadChecksum;
 } DashboardPacketTail_t;
+
 #pragma pack(pop)
-
-// Otherwise, assume GCC/Clang
-#else
-typedef struct __attribute__((packed)) {
-    uint8_t packetType;
-    uint8_t packetContentType;
-    uint16_t payloadKeySize;
-    uint16_t payloadValueSize;
-    uint32_t timestamp;
-    uint16_t checksum;
-} DashboardPacketHeader_t;
-
-typedef struct __attribute__((packed)) {
-    char label[24];
-    uint16_t packetID;
-    uint16_t valueType;
-    union {
-        float floatValue;
-        int32_t int32Value;
-        uint32_t uint32Value;
-        bool boolValue;
-    };
-} LiveDataPacket_t;
-
-typedef struct __attribute__((packed)) {
-    uint32_t payloadChecksum;
-} DashboardPacketTail_t;
-#endif
 
 typedef struct Dashboard {
     uint16_t liveDataCount;

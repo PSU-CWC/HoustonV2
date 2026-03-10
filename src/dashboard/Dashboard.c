@@ -1,21 +1,11 @@
 #include "Dashboard.h"
 #include "COBS.h"
 
-#ifdef ESP32
-    // Settings for ESP32
-    enum {
-        kLiveDataBufSize = 50,
-        kAlertBufSize = 2048, 
-        kAlertBufCOBSize = kAlertBufSize + (kAlertBufSize / 254) + 2,
-    };
-#else
-    // Minimal settings for Arduino Uno
-    enum {
-        kLiveDataBufSize = 8,
-        kAlertBufSize = 256,
-        kAlertBufCOBSize = kAlertBufSize + (kAlertBufSize / 254) + 2,
-    };
-#endif
+enum {
+    kLiveDataBufSize = 50,
+    kAlertBufSize = 2048, 
+    kAlertBufCOBSize = kAlertBufSize + (kAlertBufSize / 254) + 2,
+};
 
 static char alertBuffer[kAlertBufSize] = {0};
 static char alertBufferCOBS[kAlertBufCOBSize] = {0};
