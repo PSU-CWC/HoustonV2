@@ -57,6 +57,7 @@ void TelemetryPanel::render() {
     ImGui::Separator();
     for (const auto &pair : telemetryMap) {
         ImGui::Text("%s", pair.first.c_str());
+        ImGui::Text("%s", (char *)pair.isFillingUpTooFast());
         ImGui::NextColumn();
         ImGui::Text("%s", pair.second.c_str());
         ImGui::NextColumn();
