@@ -4,16 +4,22 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <cstring>
+
 namespace fs = std::filesystem;
 
-ImPlotPoint TelemetryGetter(int idx, void* data) {
-    printf("TelemetryGetter called for idx %d\n", idx);
+namespace {
 
-    auto* buffer = (Util::ScrollingBuffer*)data;
-    // This handles the circular wrap-around logic
-    int real_idx = (buffer->Offset + idx) % (int)buffer->Data.size();
-    return ImPlotPoint(buffer->Data[real_idx].x, buffer->Data[real_idx].y);
+void PlotTelemetryBuffer(const std::string& label, const Util::ScrollingBuffer& buffer) {
+    if (buffer.Data.empty()) {
+        return;
+    }
+
+    ImPlotSpec spec(ImPlotProp_Stride, sizeof(ImVec2), ImPlotProp_Offset, buffer.Offset);
+    ImPlot::PlotLine(label.c_str(), &buffer.Data[0].x, &buffer.Data[0].y, static_cast<int>(buffer.Data.size()), spec);
 }
+
+} // namespace
 
 void TelemetryPanel::start() {
     telemetryMap.clear();
@@ -29,8 +35,8 @@ void TelemetryPanel::render() {
         while (queueData && !queueData->isEmpty()) {
             auto dataOpt = queueData->pop();
             if (dataOpt.has_value()) {
-                auto [key, val] = dataOpt.value();
-                telemetryMap[key] = val; 
+                auto [key, val] = std::move(dataOpt.value());
+                telemetryMap.insert_or_assign(std::move(key), std::move(val));
             }
         }
     }
@@ -43,7 +49,8 @@ void TelemetryPanel::render() {
 
         for (size_t i = 1; i < csvHeaders.size(); i++) {
             const std::string& key = csvHeaders[i];
-            file << (telemetryMap.count(key) > 0 ? telemetryMap[key] : "0");
+            const auto telemetryIt = telemetryMap.find(key);
+            file << (telemetryIt != telemetryMap.end() ? telemetryIt->second : "0");
             if (i < csvHeaders.size() - 1) file << ",";
         }
         file << "\n";
@@ -141,7 +148,9 @@ void TelemetryPanel::graphData() {
     
     // 1. Draw checkboxes for each telemetry metric at the top
     for (const auto &pair : telemetryMap) {
-        ImGui::Checkbox(pair.first.c_str(), &showMap[pair.first]);
+        auto [showIt, inserted] = showMap.try_emplace(pair.first, false);
+        (void)inserted;
+        ImGui::Checkbox(pair.first.c_str(), &showIt->second);
         ImGui::SameLine();
     }
     ImGui::NewLine(); // Move to a new line after checkboxes
@@ -152,13 +161,16 @@ void TelemetryPanel::graphData() {
     if (!paused) {
         t += ImGui::GetIO().DeltaTime;
         for (const auto &pair : telemetryMap) {
-            if (showMap.count(pair.first) && showMap[pair.first]) {
+            const auto showIt = showMap.find(pair.first);
+            if (showIt != showMap.end() && showIt->second) {
                 try {
                     float value = std::stof(pair.second);
-                    if (dataMap.count(pair.first) == 0 || dataMap[pair.first] == nullptr) {
-                        dataMap[pair.first] = new Util::ScrollingBuffer(); 
+                    auto [bufferIt, inserted] = dataMap.try_emplace(pair.first, nullptr);
+                    (void)inserted;
+                    if (!bufferIt->second) {
+                        bufferIt->second = std::make_unique<Util::ScrollingBuffer>();
                     }
-                    dataMap[pair.first]->AddPoint(t, value);
+                    bufferIt->second->AddPoint(t, value);
                 } catch (const std::exception& e) {
                     // Handle non-numeric telemetry strings gracefully
                 }
@@ -178,13 +190,11 @@ void TelemetryPanel::graphData() {
         ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 100, ImGuiCond_Once);
 
         for (const auto &pair : telemetryMap) {
-            if (showMap.count(pair.first) && showMap[pair.first]) {
-                auto& buffer = dataMap[pair.first];
-                if (buffer && !buffer->Data.empty()) {
-                    ImPlot::PlotLineG(pair.first.c_str(), 
-                                    TelemetryGetter, 
-                                    (void*)buffer, 
-                                    (int)buffer->Data.size());
+            const auto showIt = showMap.find(pair.first);
+            if (showIt != showMap.end() && showIt->second) {
+                const auto bufferIt = dataMap.find(pair.first);
+                if (bufferIt != dataMap.end() && bufferIt->second) {
+                    PlotTelemetryBuffer(pair.first, *bufferIt->second);
                 }
             }
         }

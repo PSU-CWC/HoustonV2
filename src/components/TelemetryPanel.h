@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <memory>
 #include "../pch.h"
 
 #include "Component.h"
@@ -15,7 +16,7 @@ private:
     float history = 10.0f;
     bool autoScale = true;
     
-    std::map<std::string, Util::ScrollingBuffer *> dataMap;
+    std::map<std::string, std::unique_ptr<Util::ScrollingBuffer>> dataMap;
     std::map<std::string, bool> showMap; // Changed bool* to bool for safety
     
     char csvFileBuffer[256] = "data.csv";
