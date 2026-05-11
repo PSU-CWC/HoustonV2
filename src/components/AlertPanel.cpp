@@ -21,7 +21,7 @@ void AlertPanel::render() {
     ImGui::Begin("Alerts");
     for (auto &s: alerts) {
         ImGui::Text("%s", s.c_str());
-        ImGui::Text("%s", (char *)s.isFillingUpTooFast());
+        // ImGui::Text("%s", (char *)s.isFillingUpTooFast());
     }
     if (ImGui::Button("Clear")) {
         alerts.clear();

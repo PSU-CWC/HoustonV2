@@ -31,7 +31,7 @@ public:
         return queue.empty();
     }
 
-    bool isFillingUpTooFast() { //My assumption is that, if the program is working normally, then the throughput will be high enough s.t. the number of elements in the queue will never exceed a certain value
-        return (queue.size()>100);
-    } //This function checks if the queue has exceeded that value and returns true if it has
+    // bool isFillingUpTooFast() { //My assumption is that, if the program is working normally, then the throughput will be high enough s.t. the number of elements in the queue will never exceed a certain value
+    //     return (queue.size()>100);
+    // } //This function checks if the queue has exceeded that value and returns true if it has
 };
